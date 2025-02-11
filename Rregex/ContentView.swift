@@ -20,32 +20,43 @@ struct HUDVisualEffectView: NSViewRepresentable {
         view.material = .menu
         view.blendingMode = .behindWindow
         view.state = .active
+        view.wantsLayer = true
         return view
     }
 
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
-        nsView.material = .menu
-        nsView.blendingMode = .behindWindow
-        nsView.state = .active
+        if nsView.material != .menu {
+            nsView.material = .menu
+        }
+        if nsView.blendingMode != .behindWindow {
+            nsView.blendingMode = .behindWindow
+        }
+        if nsView.state != .active {
+            nsView.state = .active
+        }
     }
+}
+
+struct FindView: NSViewRepresentable {
+    let callback: (NSView) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async{self.callback(view)}
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context){}
 }
 
 struct SavedRegex: Codable, Identifiable {
     let id: UUID
-    let regex: String
+    var regex: String
     let description: String
+    let flags: [String]
 }
 
 struct ContentView: View {
-    @State private var regex: String = ""
-    @State private var textEditorContent: String = "This is some text, you can edit is as you need to test your regex.\n10 km SSW of Idyllwild, CA\n9 km WSW of Willow, Alaska\n2 km E of Magas Arriba, Puerto Rico\n267 km SSE of Alo, Wallis and Futuna"
-    @State private var attributedText: NSAttributedString = NSAttributedString(string: "This is some text, you can edit is as you need to test your regex.\n10 km SSW of Idyllwild, CA\n9 km WSW of Willow, Alaska\n2 km E of Magas Arriba, Puerto Rico\n267 km SSE of Alo, Wallis and Futuna", attributes: [.foregroundColor: NSColor.labelColor, .font: NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)])
-    @State private var isCaseInsensitive: Bool = false
-    @State private var isGlobal: Bool = true
-    @State private var isMultiline: Bool = false
-    @State private var isUnicode: Bool = false
-    @State private var savedRegex: [SavedRegex] = []
-    @AppStorage("savedRegexData") private var savedRegexData: Data = Data()
     @State private var cheatsheet: [CheatsheetItem] = [
         CheatsheetItem(id: 1, symbol: ".", desc: "Any character except a newline", example: "`a.c` matches `abc`, `aec`"),
         CheatsheetItem(id: 2, symbol: "\\w \\d \\s", desc: "A word character (\\w),\ndigit (\\d),\nor whitespace (\\s)", example: "`A\\dC` matches `A1C`, `A2C`"),
@@ -98,12 +109,26 @@ struct ContentView: View {
         CheatsheetItem(id: 49, symbol: "[[:blank:]]", desc: "Space or tab character (POSIX)", example: "`[[:blank:]]` matches ` ` (space), `    ` (tab)"),
         CheatsheetItem(id: 50, symbol: "[[:xdigit:]]", desc: "Characters that are hexadecimal digits (POSIX)", example: "`[[:xdigit:]]` matches `47bb03a0`, `c369324edc`")
     ]
+    @State private var regex: String = ""
+    @State private var textEditorContent: String = "This is some text, you can edit is as you need to test your regex.\n10 km SSW of Idyllwild, CA\n9 km WSW of Willow, Alaska\n2 km E of Magas Arriba, Puerto Rico\n267 km SSE of Alo, Wallis and Futuna"
+    @State private var attributedText: NSAttributedString = NSAttributedString(string: "This is some text, you can edit is as you need to test your regex.\n10 km SSW of Idyllwild, CA\n9 km WSW of Willow, Alaska\n2 km E of Magas Arriba, Puerto Rico\n267 km SSE of Alo, Wallis and Futuna", attributes: [.foregroundColor: NSColor.labelColor, .font: NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)])
+    @State private var isCaseInsensitive: Bool = false
+    @State private var isGlobal: Bool = true
+    @State private var isMultiline: Bool = false
+    @State private var isUnicode: Bool = false
+    @State private var savedRegex: [SavedRegex] = []
+    @AppStorage("savedRegexData") private var savedRegexData: Data = Data()
     @State private var selectedItem: CheatsheetItem? = nil
     @State private var showPopover: Bool = false
-    @State private var rtr: SavedRegex?
+    @State private var rtr: SavedRegex? //rtr=regex to remove
     @State private var showDeleteConfirm: Bool = false
     @State private var showSavePopover: Bool = false
     @State private var saveRegexDescription: String = ""
+    @State private var editingRegex: String?
+    @State private var editingRegexId: UUID?
+    @State private var regexCopyAndShareType: String = "onlyRegex"
+    @State private var settingsPanel: NSPanel? = nil
+    @State private var anchors: [UUID: NSView] = [:]
     
     var body: some View {
         NavigationSplitView {
@@ -111,9 +136,25 @@ struct ContentView: View {
         } detail : {
             detailView()
         }
-
+        .toolbar {
+            ToolbarItem(id:"settings", placement: .automatic) {
+                Button(action: {
+                    let settingsPanel = createSettingsPanel()
+                    settingsPanel?.makeKeyAndOrderFront(nil)
+                }) {
+                    Image(systemName: "gear")
+                        .imageScale(.large)
+                        .symbolRenderingMode(.monochrome)
+                        .foregroundStyle(.primary)
+                        .font(.subheadline)
+                        .padding()
+                }
+            }
+        }
         .edgesIgnoringSafeArea(.all)
-        .onAppear(perform: loadSavedRegex)
+        .onAppear {
+            savedRegex = Funcs.loadSavedRegex(savedRegexData: savedRegexData)
+        }
         .alert(isPresented: $showDeleteConfirm) {
             Alert(
                 title: Text("Delete Saved Regex"),
@@ -123,6 +164,31 @@ struct ContentView: View {
             )
         }
     }
+    
+    private func createSettingsPanel() -> NSPanel? {
+            if settingsPanel == nil {
+                let panel = NSPanel(contentRect: NSRect(x:0,y:0,width:450,height:450), styleMask: [.unifiedTitleAndToolbar, .borderless, .titled, .closable, .hudWindow, .utilityWindow], backing: .buffered, defer: false)
+                
+                panel.isFloatingPanel = true
+                panel.level = .floating
+                panel.hidesOnDeactivate = true
+                panel.isReleasedWhenClosed = false
+                panel.title = "Settings"
+                panel.contentView = NSHostingView(rootView: SettingsView(regexCopyAndShareType: $regexCopyAndShareType))
+                
+                settingsPanel=panel
+                
+                panel.makeKeyAndOrderFront(nil)
+                panel.center()
+                panel.isOpaque = false
+                
+                
+                return panel
+            } else {
+                settingsPanel?.makeKeyAndOrderFront(nil)
+                return settingsPanel!
+            }
+        }
     
     @ViewBuilder
     private func listView() -> some View {
@@ -140,28 +206,75 @@ struct ContentView: View {
     @ViewBuilder
     private func savedRegexSection() -> some View {
         Section("Saved Regex") {
-//            LazyVStack(alignment: .leading, spacing:10) {
                 ForEach(savedRegex) { r in
                     VStack(alignment: .leading, spacing: 10){
-                        Button(action: {regex=r.regex}) {
-                            VStack(alignment: .leading) {
-                                Text(r.regex)
-                                    .font(.system(.subheadline, design: .monospaced)).bold().foregroundStyle(.primary)
-                                Text(r.description)
-                                    .font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary)
+                        if editingRegexId == r.id {
+                            TextField("Edit Regex", text: Binding(
+                                get: { editingRegex ?? r.regex },
+                                set: { editingRegex = $0 }
+                            ), onCommit: {
+                                if let newRegex = editingRegex {
+                                    updateSavedRegex(id: r.id, newRegex: newRegex)
+                                }
+                                editingRegex = nil
+                                editingRegexId = nil
+                            })
+                            .textFieldStyle(PlainTextFieldStyle())
+                            .font(.system(.subheadline, design: .monospaced))
+                        } else {
+                            Button(action: {regex=r.regex}) {
+                                VStack(alignment: .leading) {
+                                    Text("/")
+                                        .foregroundStyle(.secondary)
+                                        .font(.system(.subheadline, design: .monospaced))
+                                    + Text(r.regex)
+                                        .font(.system(.subheadline, design: .monospaced))
+                                        .bold()
+                                        .foregroundStyle(.primary)
+                                    + Text("/\(r.flags.joined())")
+                                        .foregroundStyle(.secondary)
+                                        .font(.system(.subheadline, design: .monospaced))
+                                    Text(r.description)
+                                        .font(.system(.caption, design: .monospaced))
+                                        .foregroundStyle(.secondary)
+                                }
                             }
-                        }
-                        .contextMenu {
-                            Button("Delete", role: .destructive) {
-                                removeSavedRegex(r)
+                            .background(
+                                FindView { v in
+                                    anchors[r.id]=v
+                                }
+                            )
+                            .contextMenu {
+                                savedRegexSectionContextMenu(r:r)
                             }
+                            .buttonStyle(PlainButtonStyle())
                         }
-                        .buttonStyle(PlainButtonStyle())
+                        
                         if savedRegex.count>1 && r.id != savedRegex.last?.id {Divider()}
                     }
                    
                 }
-//            }
+        }
+    }
+    
+    @ViewBuilder
+    private func savedRegexSectionContextMenu(r: SavedRegex) -> some View {
+        Button("Copy") {
+            let pb = NSPasteboard.general
+            pb.clearContents()
+            pb.setString(regexCopyAndShareType == "onlyRegex" ? r.regex : regexCopyAndShareType == "slashRegex" ? "/\(r.regex)/" : regexCopyAndShareType == "slashRegexFlags" ? "/\(r.regex)/\(r.flags.joined())" : "Invalid regex copy type, check your settings.", forType: .string)
+        }
+        Button("Edit") {
+            editingRegex=r.regex
+            editingRegexId=r.id
+        }
+        Button("Share") {
+            if let anchor=anchors[r.id] {
+                shareButtonClicked(regex: regexCopyAndShareType == "onlyRegex" ? r.regex : regexCopyAndShareType == "slashRegex" ? "/\(r.regex)/" : regexCopyAndShareType == "slashRegexFlags" ? "/\(r.regex)/\(r.flags.joined())" : "Invalid regex share type, check your settings.", anchor: anchor)
+            }
+        }
+        Button("Delete", role: .destructive) {
+            removeSavedRegex(r)
         }
     }
     
@@ -201,7 +314,7 @@ struct ContentView: View {
                                 .font(.body)
                             Text("Example: ")
                                 .font(.headline)
-                            formatStringBackticks(e.example)
+                            Funcs.formatStringBackticks(e.example)
                         }
                         .padding(20)
                         .frame(minWidth: 175)
@@ -222,11 +335,11 @@ struct ContentView: View {
                 .padding()
                 .padding(.bottom, -15)
             HStack {
-                TextField("Enter your regex...", text: $regex, onCommit: applyRegex)
+                TextField("Enter your regex...", text: $regex, onCommit: {attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)})
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                     .font(.system(.body, design: .monospaced))
                     .onChange(of: regex, initial: false) {
-                        applyRegex()
+                        attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)
                     }
                     .frame(maxWidth: .infinity)
                     .overlay(
@@ -245,7 +358,7 @@ struct ContentView: View {
                     .buttonStyle(.borderless)
                     .menuStyle(.automatic)
                     .onChange(of: [isCaseInsensitive, isGlobal, isMultiline, isUnicode]) {
-                        applyRegex()
+                        attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)
                     }
                 Button(action: {showSavePopover=true}) {
                     Image(systemName: "bookmark")
@@ -258,11 +371,11 @@ struct ContentView: View {
                                     .textFieldStyle(RoundedBorderTextFieldStyle())
                                     .padding(.vertical)
                                     .onSubmit{
-                                        saveRegex()
+                                        Funcs.saveRegex(regex: regex, description: saveRegexDescription, isGlobal: isGlobal, isCaseInsensitive: isCaseInsensitive, isMultiline: isMultiline, isUnicode: isUnicode, savedRegex: &savedRegex, savedRegexData: &savedRegexData)
                                         showSavePopover=false
                                     }
                                 Button("Save") {
-                                    saveRegex()
+                                    Funcs.saveRegex(regex: regex, description: saveRegexDescription, isGlobal: isGlobal, isCaseInsensitive: isCaseInsensitive, isMultiline: isMultiline, isUnicode: isUnicode, savedRegex: &savedRegex, savedRegexData: &savedRegexData)
                                     showSavePopover=false
                                 }.buttonStyle(BorderedProminentButtonStyle()).padding(.vertical)
                             }
@@ -278,36 +391,10 @@ struct ContentView: View {
         }
     }
     
-    private func formatStringBackticks(_ e: String) -> Text {
-        let parts=e.split(separator: "`", omittingEmptySubsequences: false)
-        
-        var formatted = Text("")
-        for (i,p) in parts.enumerated() {
-            if i%2==0 {
-                formatted = formatted + Text(p)
-                    .font(.body)
-            } else {
-                formatted = formatted + Text(p)
-                    .font(.system(.body, design: .monospaced))
-                    .bold()
-            }
+    private func updateSavedRegex(id: UUID, newRegex: String) {
+        if let i = savedRegex.firstIndex(where: {$0.id == id}) {
+            savedRegex[i].regex = newRegex
         }
-        return formatted
-    }
-    
-    private func loadSavedRegex() {
-        if let loaded = try? JSONDecoder().decode([SavedRegex].self, from: savedRegexData) {
-            savedRegex = loaded
-        }
-    }
-
-    private func saveRegex() {
-        let newSavedRegex = SavedRegex(id: UUID(), regex: regex, description: saveRegexDescription)
-        savedRegex.append(newSavedRegex)
-        if let encoded = try? JSONEncoder().encode(savedRegex) {
-            savedRegexData = encoded
-        }
-        saveRegexDescription = ""
     }
 
     private func removeSavedRegex(_ r: SavedRegex) {
@@ -323,44 +410,34 @@ struct ContentView: View {
         }
     }
     
-    private func applyRegex() {
-        do {
-            var options: NSRegularExpression.Options = []
-            if isCaseInsensitive {options.insert(.caseInsensitive)}
-            if isMultiline {options.insert(.anchorsMatchLines)}
-            if isUnicode {options.insert(.useUnicodeWordBoundaries)}
-            
-            let attributedString = NSMutableAttributedString(string: textEditorContent)
-            let regex = try NSRegularExpression(pattern: self.regex, options: options)
-            let nsString = textEditorContent as NSString
-            if isGlobal {
-                let matches = regex.matches(in: textEditorContent, range:NSRange(location: 0, length: nsString.length))
-                print(matches)
-                attributedString.addAttributes([
-                    .foregroundColor: NSColor.controlTextColor,
-                    .font: NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
-                    .backgroundColor: NSColor.clear
-                ], range: NSRange(location: 0, length: attributedString.length))
+    private func shareButtonClicked(regex: String, anchor: NSView) {
+        let items = [regex]
+        let picker = NSSharingServicePicker(items: items)
+        picker.show(relativeTo: .zero, of: anchor, preferredEdge: .minY)
+    }
+}
 
-                for match in matches {
-                    attributedString.addAttribute(.backgroundColor, value: NSColor(calibratedRed: 70/255.0, green: 137/255.0, blue: 199/255.0, alpha: 0.8), range: match.range)
-                }
-            } else {
-                if let match = regex.firstMatch(in: textEditorContent, range:NSRange(location: 0, length: nsString.length)) {
-                    print(match)
-                    attributedString.addAttributes([
-                        .foregroundColor: NSColor.controlTextColor,
-                        .font: NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
-                        .backgroundColor: NSColor.clear
-                    ], range: NSRange(location: 0, length: attributedString.length))
-                    attributedString.addAttribute(.backgroundColor, value:NSColor(calibratedRed: 70/255.0, green: 137/255.0, blue: 199/255.0, alpha: 0.8), range:match.range)
-                }
+struct SettingsView: View {
+    @Binding var regexCopyAndShareType: String
+    
+    var body: some View {
+        Picker("Regex copy/share style: ", selection: $regexCopyAndShareType) {
+            HStack {
+                Text("regex")
+                    .font(.system(.body, design: .monospaced))
             }
-
-            self.attributedText = attributedString
-        } catch {
-            self.attributedText = NSAttributedString(string: textEditorContent)
-        }
+                .tag("onlyRegex")
+            HStack {
+                Text("/regex/")
+                    .font(.system(.body, design: .monospaced))
+            }
+                .tag("slashRegex")
+            HStack {
+                Text("/regex/flags")
+                    .font(.system(.body, design: .monospaced))
+            }
+                .tag("slashRegexFlags")
+        }.padding()
     }
 }
 
@@ -417,6 +494,177 @@ struct AttributedTextView: NSViewRepresentable {
                 ], range: NSRange(location: 0, length: attributedString.length))
             }
         }
+    }
+}
+
+struct MenuBarItemView: View {
+    @State private var regex: String = ""
+    @State private var textEditorContent: String = "This is some text, you can edit it as you need to test your regex.\n10 km SSW of Idyllwild, CA\n9 km WSW of Willow, Alaska\n2 km E of Magas Arriba, Puerto Rico"
+    @State private var attributedText: NSAttributedString = NSAttributedString(string: "This is some text, you can edit it as you need to test your regex.\n10 km SSW of Idyllwild, CA\n9 km WSW of Willow, Alaska\n2 km E of Magas Arriba, Puerto Rico", attributes: [.foregroundColor: NSColor.labelColor, .font: NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)])
+    @State private var isCaseInsensitive: Bool = false
+    @State private var isGlobal: Bool = true
+    @State private var isMultiline: Bool = false
+    @State private var isUnicode: Bool = false
+    @State private var showSavePopover: Bool = false
+    @State private var saveRegexDescription: String = ""
+    @AppStorage("savedRegexData") private var savedRegexData: Data = Data()
+    @State private var savedRegex: [SavedRegex] = []
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                TextField("Enter your regex...", text: $regex, onCommit: {attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)})
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .font(.system(.body, design: .monospaced))
+                    .onChange(of: regex, initial: false) { _, _ in
+                        attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 7)
+                            .stroke(Color.gray.opacity(0.6), lineWidth: 1)
+                    )
+                Menu {
+                    Toggle("Case insensitive (i)", isOn: $isCaseInsensitive)
+                    Toggle("Global (g)", isOn: $isGlobal)
+                    Toggle("Multiline (m)", isOn: $isMultiline)
+                    Toggle("Unicode (u)", isOn: $isUnicode)
+                } label: {
+                    Image(systemName: "flag")
+                        .font(.title2)
+                }
+                .frame(maxWidth: 50)
+                .menuStyle(.automatic)
+                .buttonStyle(.borderless)
+                .onChange(of: [isCaseInsensitive, isGlobal, isMultiline, isUnicode], initial: false) { _, _ in
+                    attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)
+                }
+                Button(action: { showSavePopover = true }) {
+                    Image(systemName: "bookmark")
+                }
+                .buttonStyle(.borderless)
+                .frame(maxWidth: 15)
+                .foregroundStyle(.primary)
+                .popover(isPresented: $showSavePopover) {
+                    VStack {
+                        Funcs.formatStringBackticks("Save regex `\(regex)`").font(.title2).bold()
+                        HStack {
+                            TextField("Enter short description...", text: $saveRegexDescription)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .padding(.vertical)
+                                .onSubmit {
+                                    Funcs.saveRegex(regex: regex, description: saveRegexDescription, isGlobal: isGlobal, isCaseInsensitive: isCaseInsensitive, isMultiline: isMultiline, isUnicode: isUnicode, savedRegex: &savedRegex, savedRegexData: &savedRegexData)
+                                    showSavePopover = false
+                                }
+                            Button("Save") {
+                                Funcs.saveRegex(regex: regex, description: saveRegexDescription, isGlobal: isGlobal, isCaseInsensitive: isCaseInsensitive, isMultiline: isMultiline, isUnicode: isUnicode, savedRegex: &savedRegex, savedRegexData: &savedRegexData)
+                                showSavePopover = false
+                            }
+                .buttonStyle(BorderedProminentButtonStyle())
+                            .padding(.vertical)
+                        }
+                    }
+                    .padding()
+                }
+            }
+            GeometryReader { g in
+                ScrollView {
+                    AttributedTextView(attributedText: $attributedText, onTextChange: { n in
+                        textEditorContent = n
+                    })
+                    .padding(.horizontal)
+                    .frame(height: g.size.height)
+                }
+            }
+        }
+        .padding()
+        .frame(width: 300, height: 200)
+        .onAppear {
+            savedRegex = Funcs.loadSavedRegex(savedRegexData: savedRegexData)
+        }
+    }
+}
+
+class Funcs {
+    static func applyRegex(regex: String, textEditorContent: String, isCaseInsensitive: Bool, isGlobal: Bool, isMultiline: Bool, isUnicode: Bool) -> NSAttributedString {
+        do {
+            var options: NSRegularExpression.Options = []
+            if isCaseInsensitive { options.insert(.caseInsensitive) }
+            if isMultiline { options.insert(.anchorsMatchLines) }
+            if isUnicode { options.insert(.useUnicodeWordBoundaries) }
+
+            let attributedString = NSMutableAttributedString(string: textEditorContent)
+            let regex = try NSRegularExpression(pattern: regex, options: options)
+            let nsString = textEditorContent as NSString
+            if isGlobal {
+                let matches = regex.matches(in: textEditorContent, range: NSRange(location: 0, length: nsString.length))
+                attributedString.addAttributes([
+                    .foregroundColor: NSColor.controlTextColor,
+                    .font: NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
+                    .backgroundColor: NSColor.clear
+                ], range: NSRange(location: 0, length: attributedString.length))
+
+                for match in matches {
+                    attributedString.addAttribute(.backgroundColor, value: NSColor(calibratedRed: 70/255.0, green: 137/255.0, blue: 199/255.0, alpha: 0.8), range: match.range)
+                }
+            } else {
+                if let match = regex.firstMatch(in: textEditorContent, range: NSRange(location: 0, length: nsString.length)) {
+                    attributedString.addAttributes([
+                        .foregroundColor: NSColor.controlTextColor,
+                        .font: NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
+                        .backgroundColor: NSColor.clear
+                    ], range: NSRange(location: 0, length: attributedString.length))
+                    attributedString.addAttribute(.backgroundColor, value: NSColor(calibratedRed: 70/255.0, green: 137/255.0, blue: 199/255.0, alpha: 0.8), range: match.range)
+                }
+            }
+
+            return attributedString
+        } catch {
+            return NSAttributedString(string: textEditorContent)
+        }
+    }
+
+    static func loadSavedRegex(savedRegexData: Data) -> [SavedRegex] {
+        if let loaded = try? JSONDecoder().decode([SavedRegex].self, from: savedRegexData) {
+            return loaded
+        }
+        return []
+    }
+
+    static func saveRegex(regex: String, description: String, isGlobal: Bool, isCaseInsensitive: Bool, isMultiline: Bool, isUnicode: Bool, savedRegex: inout [SavedRegex], savedRegexData: inout Data) {
+        var newSavedRegexFlags: [String] = []
+        if isGlobal { newSavedRegexFlags.append("g") }
+        if isCaseInsensitive { newSavedRegexFlags.append("i") }
+        if isMultiline { newSavedRegexFlags.append("m") }
+        if isUnicode { newSavedRegexFlags.append("u") }
+        let newSavedRegex = SavedRegex(id: UUID(), regex: regex, description: description, flags: newSavedRegexFlags)
+        savedRegex.append(newSavedRegex)
+        if let encoded = try? JSONEncoder().encode(savedRegex) {
+            savedRegexData = encoded
+        }
+    }
+
+    static func formatStringBackticks(_ e: String) -> Text {
+        let parts=e.split(separator: "`", omittingEmptySubsequences: false)
+        
+        var formatted = Text("")
+        for (i,p) in parts.enumerated() {
+            if i%2==0 {
+                formatted = formatted + Text(p)
+                    .font(.body)
+            } else {
+                formatted = formatted + Text(p)
+                    .font(.system(.body, design: .monospaced))
+                    .bold()
+            }
+        }
+        return formatted
+    }
+}
+
+struct MenuBarItemView_Previews: PreviewProvider {
+    static var previews: some View {
+        MenuBarItemView()
     }
 }
 
