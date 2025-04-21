@@ -259,21 +259,22 @@ struct ContentView: View {
     
     @ViewBuilder
     private func savedRegexSectionContextMenu(r: SavedRegex) -> some View {
-        Button("Copy") {
-            let pb = NSPasteboard.general
-            pb.clearContents()
-            pb.setString(regexCopyAndShareType == "onlyRegex" ? r.regex : regexCopyAndShareType == "slashRegex" ? "/\(r.regex)/" : regexCopyAndShareType == "slashRegexFlags" ? "/\(r.regex)/\(r.flags.joined())" : "Invalid regex copy type, check your settings.", forType: .string)
-        }
-        Button("Edit") {
-            editingRegex=r.regex
-            editingRegexId=r.id
-        }
-        Button("Share") {
+        Button("Share"/*, systemImage: "square.and.arrow.up"*/) {
             if let anchor=anchors[r.id] {
                 shareButtonClicked(regex: regexCopyAndShareType == "onlyRegex" ? r.regex : regexCopyAndShareType == "slashRegex" ? "/\(r.regex)/" : regexCopyAndShareType == "slashRegexFlags" ? "/\(r.regex)/\(r.flags.joined())" : "Invalid regex share type, check your settings.", anchor: anchor)
             }
         }
-        Button("Delete", role: .destructive) {
+        Button("Copy"/*, systemImage: "document.on.document"*/) {
+            let pb = NSPasteboard.general
+            pb.clearContents()
+            pb.setString(regexCopyAndShareType == "onlyRegex" ? r.regex : regexCopyAndShareType == "slashRegex" ? "/\(r.regex)/" : regexCopyAndShareType == "slashRegexFlags" ? "/\(r.regex)/\(r.flags.joined())" : "Invalid regex copy type, check your settings.", forType: .string)
+        }
+        Button("Edit"/*, systemImage: "pencil"*/) {
+            editingRegex=r.regex
+            editingRegexId=r.id
+        }
+        Divider()
+        Button("Delete"/*, systemImage: "trash"*/, role: .destructive) {
             removeSavedRegex(r)
         }
     }
