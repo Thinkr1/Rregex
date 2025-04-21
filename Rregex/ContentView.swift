@@ -206,54 +206,89 @@ struct ContentView: View {
     @ViewBuilder
     private func savedRegexSection() -> some View {
         Section("Saved Regex") {
-                ForEach(savedRegex) { r in
-                    VStack(alignment: .leading, spacing: 10){
-                        if editingRegexId == r.id {
-                            TextField("Edit Regex", text: Binding(
-                                get: { editingRegex ?? r.regex },
-                                set: { editingRegex = $0 }
-                            ), onCommit: {
-                                if let newRegex = editingRegex {
-                                    updateSavedRegex(id: r.id, newRegex: newRegex)
-                                }
-                                editingRegex = nil
-                                editingRegexId = nil
-                            })
-                            .textFieldStyle(PlainTextFieldStyle())
-                            .font(.system(.subheadline, design: .monospaced))
-                        } else {
-                            Button(action: {regex=r.regex}) {
-                                VStack(alignment: .leading) {
-                                    Text("/")
-                                        .foregroundStyle(.secondary)
-                                        .font(.system(.subheadline, design: .monospaced))
-                                    + Text(r.regex)
-                                        .font(.system(.subheadline, design: .monospaced))
-                                        .bold()
-                                        .foregroundStyle(.primary)
-                                    + Text("/\(r.flags.joined())")
-                                        .foregroundStyle(.secondary)
-                                        .font(.system(.subheadline, design: .monospaced))
-                                    Text(r.description)
-                                        .font(.system(.caption, design: .monospaced))
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .background(
-                                FindView { v in
-                                    anchors[r.id]=v
-                                }
-                            )
-                            .contextMenu {
-                                savedRegexSectionContextMenu(r:r)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                        
-                        if savedRegex.count>1 && r.id != savedRegex.last?.id {Divider()}
-                    }
-                   
-                }
+            ForEach(savedRegex) { r in
+                savedRegexItemView(r: r)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func savedRegexItemView(r: SavedRegex) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if editingRegexId == r.id {
+                regexEditView(r: r)
+            } else {
+                regexDisplayView(r: r)
+            }
+            
+            if savedRegex.count > 1 && r.id != savedRegex.last?.id {
+                Divider()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func regexEditView(r: SavedRegex) -> some View {
+        TextField("Edit Regex", text: Binding(
+            get: { editingRegex ?? r.regex },
+            set: { editingRegex = $0 }
+        ), onCommit: {
+            if let newRegex = editingRegex {
+                updateSavedRegex(id: r.id, newRegex: newRegex)
+            }
+            editingRegex = nil
+            editingRegexId = nil
+        })
+        .textFieldStyle(PlainTextFieldStyle())
+        .font(.system(.subheadline, design: .monospaced))
+    }
+
+    @ViewBuilder
+    private func regexDisplayView(r: SavedRegex) -> some View {
+        Button(action: { regex = r.regex }) {
+            regexTextContent(r: r)
+        }
+        .background(
+            FindView { v in
+                anchors[r.id] = v
+            }
+        )
+        .contextMenu {
+            savedRegexSectionContextMenu(r: r)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
+    @ViewBuilder
+    private func regexTextContent(r: SavedRegex) -> some View {
+        VStack(alignment: .leading) {
+            if #available(macOS 14.0, *) {
+                Text("/")
+                    .foregroundStyle(.secondary)
+                    .font(.system(.subheadline, design: .monospaced))
+                + Text(r.regex)
+                    .font(.system(.subheadline, design: .monospaced))
+                    .bold()
+                    .foregroundStyle(.primary)
+                + Text("/\(r.flags.joined())")
+                    .foregroundStyle(.secondary)
+                    .font(.system(.subheadline, design: .monospaced))
+            } else {
+                Text("/")
+                    .foregroundColor(.secondary)
+                    .font(.system(.subheadline, design: .monospaced))
+                + Text(r.regex)
+                    .font(.system(.subheadline, design: .monospaced))
+                    .bold()
+                    .foregroundColor(.primary)
+                + Text("/\(r.flags.joined())")
+                    .foregroundColor(.secondary)
+                    .font(.system(.subheadline, design: .monospaced))
+            }
+            
+            Text(r.description)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(.secondary)
         }
     }
     
@@ -336,31 +371,8 @@ struct ContentView: View {
                 .padding()
                 .padding(.bottom, -15)
             HStack {
-                TextField("Enter your regex...", text: $regex, onCommit: {attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)})
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .font(.system(.body, design: .monospaced))
-                    .onChange(of: regex, initial: false) {
-                        attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 7)
-                            .stroke(Color.gray.opacity(0.6), lineWidth:1)
-                    )
-                Menu {
-                    Toggle("Case insensitive (i)", isOn: $isCaseInsensitive)
-                    Toggle("Global (g)", isOn: $isGlobal)
-                    Toggle("Multiline (m)", isOn: $isMultiline)
-                    Toggle("Unicode (u)", isOn: $isUnicode)
-                } label: {
-                    Image(systemName: "flag")
-                        .font(.title2)
-                }.frame(maxWidth: 50).menuStyle(.automatic)
-                    .buttonStyle(.borderless)
-                    .menuStyle(.automatic)
-                    .onChange(of: [isCaseInsensitive, isGlobal, isMultiline, isUnicode]) {
-                        attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)
-                    }
+                regexTextField()
+                regexModMenu()
                 Button(action: {showSavePopover=true}) {
                     Image(systemName: "bookmark")
                 }.buttonStyle(.borderless).frame(maxWidth: 15).foregroundStyle(.primary)
@@ -389,6 +401,74 @@ struct ContentView: View {
             .frame(maxHeight: .infinity)
             .padding(.horizontal)
             Spacer()
+        }
+    }
+    
+    @ViewBuilder
+    func regexTextField() -> some View {
+        if #available(macOS 14, *) {
+            TextField("Enter your regex...", text: $regex, onCommit: {
+                attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)
+            })
+            .textFieldStyle(RoundedBorderTextFieldStyle())
+            .font(.system(.body, design: .monospaced))
+            .onChange(of: regex, initial: false) {
+                attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)
+            }
+            .frame(maxWidth: .infinity)
+            .overlay(
+                RoundedRectangle(cornerRadius: 7)
+                    .stroke(Color.gray.opacity(0.6), lineWidth: 1)
+            )
+        } else {
+            TextField("Enter your regex...", text: $regex, onCommit: {
+                attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)
+            })
+            .textFieldStyle(RoundedBorderTextFieldStyle())
+            .font(.system(.body, design: .monospaced))
+            .onChange(of: regex) { _ in
+                attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)
+            }
+            .frame(maxWidth: .infinity)
+            .overlay(
+                RoundedRectangle(cornerRadius: 7)
+                    .stroke(Color.gray.opacity(0.6), lineWidth: 1)
+            )
+        }
+    }
+    
+    @ViewBuilder
+    private func regexModMenu() -> some View {
+        if #available(macOS 14, *) {
+            Menu {
+                Toggle("Case insensitive (i)", isOn: $isCaseInsensitive)
+                Toggle("Global (g)", isOn: $isGlobal)
+                Toggle("Multiline (m)", isOn: $isMultiline)
+                Toggle("Unicode (u)", isOn: $isUnicode)
+            } label: {
+                Image(systemName: "flag")
+                    .font(.title2)
+            }.frame(maxWidth: 50).menuStyle(.automatic)
+                .buttonStyle(.borderless)
+                .menuStyle(.automatic)
+                .onChange(of: [isCaseInsensitive, isGlobal, isMultiline, isUnicode]) {
+                    attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)
+                }
+        } else {
+            Menu {
+                Toggle("Case insensitive (i)", isOn: $isCaseInsensitive)
+                Toggle("Global (g)", isOn: $isGlobal)
+                Toggle("Multiline (m)", isOn: $isMultiline)
+                Toggle("Unicode (u)", isOn: $isUnicode)
+            } label: {
+                Image(systemName: "flag")
+                    .font(.title2)
+            }.frame(maxWidth: 50).menuStyle(.automatic)
+                .buttonStyle(.borderless)
+                .menuStyle(.automatic)
+                .onChange(of: [isCaseInsensitive, isGlobal, isMultiline, isUnicode]) { _ in
+                    attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)
+                }
         }
     }
     
@@ -514,32 +594,8 @@ struct MenuBarItemView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                TextField("Enter your regex...", text: $regex, onCommit: {attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)})
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .font(.system(.body, design: .monospaced))
-                    .onChange(of: regex, initial: false) { _, _ in
-                        attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 7)
-                            .stroke(Color.gray.opacity(0.6), lineWidth: 1)
-                    )
-                Menu {
-                    Toggle("Case insensitive (i)", isOn: $isCaseInsensitive)
-                    Toggle("Global (g)", isOn: $isGlobal)
-                    Toggle("Multiline (m)", isOn: $isMultiline)
-                    Toggle("Unicode (u)", isOn: $isUnicode)
-                } label: {
-                    Image(systemName: "flag")
-                        .font(.title2)
-                }
-                .frame(maxWidth: 50)
-                .menuStyle(.automatic)
-                .buttonStyle(.borderless)
-                .onChange(of: [isCaseInsensitive, isGlobal, isMultiline, isUnicode], initial: false) { _, _ in
-                    attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)
-                }
+                menuBarRegexTextField()
+                menuBarRegexModMenu()
                 Button(action: { showSavePopover = true }) {
                     Image(systemName: "bookmark")
                 }
@@ -582,6 +638,72 @@ struct MenuBarItemView: View {
         .frame(width: 300, height: 200)
         .onAppear {
             savedRegex = Funcs.loadSavedRegex(savedRegexData: savedRegexData)
+        }
+    }
+    
+    @ViewBuilder
+    func menuBarRegexTextField() -> some View {
+        if #available(macOS 14, *) {
+            TextField("Enter your regex...", text: $regex, onCommit: {attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)})
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .font(.system(.body, design: .monospaced))
+                .onChange(of: regex, initial: false) { _, _ in
+                    attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)
+                }
+                .frame(maxWidth: .infinity)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7)
+                        .stroke(Color.gray.opacity(0.6), lineWidth: 1)
+                )
+        } else {
+            TextField("Enter your regex...", text: $regex, onCommit: {attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)})
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .font(.system(.body, design: .monospaced))
+                .onChange(of: regex) { _ in
+                    attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)
+                }
+                .frame(maxWidth: .infinity)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7)
+                        .stroke(Color.gray.opacity(0.6), lineWidth: 1)
+                )
+        }
+    }
+    
+    @ViewBuilder
+    private func menuBarRegexModMenu() -> some View {
+        if #available(macOS 14, *) {
+            Menu {
+                Toggle("Case insensitive (i)", isOn: $isCaseInsensitive)
+                Toggle("Global (g)", isOn: $isGlobal)
+                Toggle("Multiline (m)", isOn: $isMultiline)
+                Toggle("Unicode (u)", isOn: $isUnicode)
+            } label: {
+                Image(systemName: "flag")
+                    .font(.title2)
+            }
+            .frame(maxWidth: 50)
+            .menuStyle(.automatic)
+            .buttonStyle(.borderless)
+            .onChange(of: [isCaseInsensitive, isGlobal, isMultiline, isUnicode], initial: false) { _, _ in
+                attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)
+            }
+        } else {
+            Menu {
+                Toggle("Case insensitive (i)", isOn: $isCaseInsensitive)
+                Toggle("Global (g)", isOn: $isGlobal)
+                Toggle("Multiline (m)", isOn: $isMultiline)
+                Toggle("Unicode (u)", isOn: $isUnicode)
+            } label: {
+                Image(systemName: "flag")
+                    .font(.title2)
+            }
+            .frame(maxWidth: 50)
+            .menuStyle(.automatic)
+            .buttonStyle(.borderless)
+            .onChange(of: [isCaseInsensitive, isGlobal, isMultiline, isUnicode]) { _ in
+                attributedText = Funcs.applyRegex(regex: regex, textEditorContent: textEditorContent, isCaseInsensitive: isCaseInsensitive, isGlobal: isGlobal, isMultiline: isMultiline, isUnicode: isUnicode)
+            }
         }
     }
 }
