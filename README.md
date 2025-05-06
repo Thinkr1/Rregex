@@ -1,3 +1,12 @@
+<p align="center">
+  <img alt="GitHub Release" src="https://img.shields.io/github/v/release/Thinkr1/Rregex">
+  <img alt="GitHub commits since latest release" src="https://img.shields.io/github/commits-since/Thinkr1/Rregex/latest">
+  <img alt="GitHub last commit" src="https://img.shields.io/github/last-commit/Thinkr1/Rregex">
+  <img alt="GitHub Downloads (all assets, all releases)" src="https://img.shields.io/github/downloads/Thinkr1/Rregex/total">
+  <img alt="GitHub License" src="https://img.shields.io/github/license/Thinkr1/Rregex">
+  <img alt="GitHub repo size" src="https://img.shields.io/github/repo-size/Thinkr1/Rregex">
+</p>
+
 # Rregex
 
 A sleek macOS app to test your regex's. Contains ability to modify target text, save regex's, apply different flags, and get inspired by a cheatsheet.
