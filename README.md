@@ -1,5 +1,6 @@
 <p align="center">
   <img alt="GitHub Release" src="https://img.shields.io/github/v/release/Thinkr1/Rregex?style=for-the-badge">
+  <img als="PRs Welcome" src="https://img.shields.io/badge/PRs-Welcome :)-green?style=for-the-badge">
   <img alt="GitHub commits since latest release" src="https://img.shields.io/github/commits-since/Thinkr1/Rregex/latest?style=for-the-badge">
   <img alt="GitHub last commit" src="https://img.shields.io/github/last-commit/Thinkr1/Rregex?style=for-the-badge">
   <img alt="GitHub Downloads (all assets, all releases)" src="https://img.shields.io/github/downloads/Thinkr1/Rregex/total?style=for-the-badge">
