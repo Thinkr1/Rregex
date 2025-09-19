@@ -147,8 +147,10 @@ struct ContentView: View {
                         .symbolRenderingMode(.monochrome)
                         .foregroundStyle(.primary)
                         .font(.subheadline)
-                        .padding()
-                }
+                        .padding(6)
+                        .frame(width: 18, height: 18)
+                        .contentShape(Circle())
+                }.controlSize(.mini)
             }
         }
         .edgesIgnoringSafeArea(.all)
@@ -193,13 +195,14 @@ struct ContentView: View {
     @ViewBuilder
     private func listView() -> some View {
         ZStack {
-            HUDVisualEffectView().edgesIgnoringSafeArea(.all)
+//            HUDVisualEffectView().edgesIgnoringSafeArea(.all).ignoresSafeArea(.container, edges: .top)
             List {
                 savedRegexSection()
                 cheatsheetSection()
-            }
+            }.padding(.top)
             .listStyle(.sidebar)
             .scrollIndicators(.never)
+            .scrollContentBackground(.hidden)
         }
     }
     
@@ -365,11 +368,11 @@ struct ContentView: View {
     @ViewBuilder
     private func detailView() -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Rregex")
-                .font(.system(.largeTitle, design: .rounded)) // or monospaced?
-                .bold()
-                .padding()
-                .padding(.bottom, -15)
+//            Text("Rregex")
+//                .font(.system(.largeTitle, design: .rounded)) // or monospaced?
+//                .bold()
+//                .padding()
+//                .padding(.bottom, -15)
             HStack {
                 regexTextField()
                 regexModMenu()

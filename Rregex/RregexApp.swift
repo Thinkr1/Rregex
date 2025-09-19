@@ -16,12 +16,13 @@ struct RregexApp: App {
             ZStack{
                 VisualEffectBlurView()
                 ContentView()
-            }
+            }.toolbarBackgroundVisibility(.hidden)
             .onAppear {
                 modifyWindowAppearance()
             }
-        }.windowStyle(HiddenTitleBarWindowStyle())
-        
+        }//.windowStyle(HiddenTitleBarWindowStyle())
+            .windowStyle(.hiddenTitleBar)
+            .windowToolbarStyle(.unifiedCompact)
     }
     
     private func modifyWindowAppearance() {
@@ -31,20 +32,34 @@ struct RregexApp: App {
                 w.isOpaque = false
                 w.isMovableByWindowBackground = true
                 w.titlebarAppearsTransparent = true
+                w.titleVisibility = .hidden
+                w.styleMask.insert(.fullSizeContentView)
                 
-                guard let tv = w.standardWindowButton(.closeButton)?.superview else { return }
-                if let existingBlur = tv.subviews.first(where: { $0 is NSVisualEffectView }) {
-                    existingBlur.removeFromSuperview()
+                if let tv = w.standardWindowButton(.closeButton)?.superview {
+                    tv.subviews
+                        .filter { $0 is NSVisualEffectView }
+                        .forEach { $0.removeFromSuperview() }
+                    
+                    let ve = NSVisualEffectView()
+                    ve.material = .sidebar
+                    ve.blendingMode = .behindWindow
+                    ve.state = .active
+                    ve.frame = tv.bounds
+                    ve.autoresizingMask = [.width, .height]
+                    tv.addSubview(ve, positioned: .below, relativeTo: nil)
                 }
-                
-                let ve = NSVisualEffectView()
-                ve.material = .menu
-                ve.blendingMode = .behindWindow
-                ve.state = .active
-                ve.frame = tv.bounds
-                ve.autoresizingMask = [.width, .height]
-
-                tv.addSubview(ve, positioned: .below, relativeTo: nil)
+//                if let existingBlur = tv.subviews.first(where: { $0 is NSVisualEffectView }) {
+//                    existingBlur.removeFromSuperview()
+//                }
+//                
+//                let ve = NSVisualEffectView()
+//                ve.material = .menu
+//                ve.blendingMode = .behindWindow
+//                ve.state = .active
+//                ve.frame = tv.bounds
+//                ve.autoresizingMask = [.width, .height]
+//
+//                tv.addSubview(ve, positioned: .below, relativeTo: nil)
             }
         }
     }
