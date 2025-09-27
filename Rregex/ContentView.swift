@@ -136,6 +136,7 @@ struct ContentView: View {
         } detail : {
             detailView()
         }
+        .navigationSplitViewStyle(.balanced)
         .toolbar {
             ToolbarItem(id:"settings", placement: .automatic) {
                 Button(action: {
@@ -146,14 +147,14 @@ struct ContentView: View {
                         .imageScale(.large)
                         .symbolRenderingMode(.monochrome)
                         .foregroundStyle(.primary)
-                        .font(.subheadline)
+                        .font(.system(size: 13))
                         .padding(6)
-                        .frame(width: 18, height: 18)
+                        .frame(width: 24, height: 24)
                         .contentShape(Circle())
-                }.controlSize(.mini)
+                }
             }
         }
-        .edgesIgnoringSafeArea(.all)
+//        .edgesIgnoringSafeArea(.all)
         .onAppear {
             savedRegex = Funcs.loadSavedRegex(savedRegexData: savedRegexData)
         }
@@ -168,42 +169,42 @@ struct ContentView: View {
     }
     
     private func createSettingsPanel() -> NSPanel? {
-            if settingsPanel == nil {
-                let panel = NSPanel(contentRect: NSRect(x:0,y:0,width:450,height:450), styleMask: [.unifiedTitleAndToolbar, .borderless, .titled, .closable, .hudWindow, .utilityWindow], backing: .buffered, defer: false)
-                
-                panel.isFloatingPanel = true
-                panel.level = .floating
-                panel.hidesOnDeactivate = true
-                panel.isReleasedWhenClosed = false
-                panel.title = "Settings"
-                panel.contentView = NSHostingView(rootView: SettingsView(regexCopyAndShareType: $regexCopyAndShareType))
-                
-                settingsPanel=panel
-                
-                panel.makeKeyAndOrderFront(nil)
-                panel.center()
-                panel.isOpaque = false
-                
-                
-                return panel
-            } else {
-                settingsPanel?.makeKeyAndOrderFront(nil)
-                return settingsPanel!
-            }
+        if settingsPanel == nil {
+            let panel = NSPanel(contentRect: NSRect(x:0,y:0,width:450,height:450), styleMask: [.unifiedTitleAndToolbar, .borderless, .titled, .closable, .hudWindow, .utilityWindow], backing: .buffered, defer: false)
+            
+            panel.isFloatingPanel = true
+            panel.level = .floating
+            panel.hidesOnDeactivate = true
+            panel.isReleasedWhenClosed = false
+            panel.title = "Settings"
+            panel.contentView = NSHostingView(rootView: SettingsView(regexCopyAndShareType: $regexCopyAndShareType))
+            
+            settingsPanel=panel
+            
+            panel.makeKeyAndOrderFront(nil)
+            panel.center()
+            panel.isOpaque = false
+            
+            
+            return panel
+        } else {
+            settingsPanel?.makeKeyAndOrderFront(nil)
+            return settingsPanel!
         }
+    }
     
     @ViewBuilder
     private func listView() -> some View {
-        ZStack {
+//        ZStack {
 //            HUDVisualEffectView().edgesIgnoringSafeArea(.all).ignoresSafeArea(.container, edges: .top)
-            List {
-                savedRegexSection()
-                cheatsheetSection()
-            }.padding(.top)
-            .listStyle(.sidebar)
-            .scrollIndicators(.never)
-            .scrollContentBackground(.hidden)
-        }
+        List {
+            savedRegexSection()
+            cheatsheetSection()
+        }//.padding(.top)
+        .listStyle(.sidebar)
+//        .scrollIndicators(.never)
+//            .scrollContentBackground(.hidden)
+//        }
     }
     
     @ViewBuilder
