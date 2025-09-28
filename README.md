@@ -10,11 +10,9 @@
 
 # Rregex
 
-A sleek macOS app to test your regex's. Contains ability to modify target text, save regex's, apply different flags, and get inspired by a cheatsheet.
+A sleek macOS app to test your regex's. Contains ability to modify target text, save regex's, apply different flags, and fills memory gaps with the help of a cheatsheet!
 
-<img width="988" alt="Sample 1 (flags)" src="https://github.com/user-attachments/assets/ae825fcf-fc80-4971-837f-881f44e97314" />
-
-<img width="945" alt="Sample 2 (cheatsheet)" src="https://github.com/user-attachments/assets/135475f6-463d-4146-b4b6-0ea30bd6e83e" />
+<img width="1028" height="562" alt="Screenshot 2025-09-28 at 5 31 43 PM" src="https://github.com/user-attachments/assets/5b403dd5-55b4-4878-bcc0-ad9e2354e21e" />
 
 ## Install
 
@@ -30,3 +28,34 @@ sudo xattr -rd com.apple.quarantine /path/to/app/folder/Rregex.app
 b) You can allow the app to be opened in *System Settings > Privacy & Security* by clicking "Open Anyway" for Rregex.app:
 
 <img width="458" alt="Screenshot 2025-04-21 at 3 55 00 PM" src="https://github.com/user-attachments/assets/8c5c429a-035c-48d4-a51d-95e53bcb9c50" />
+
+---
+
+### Verify File Integrity
+
+You can verify that your download hasn’t been tampered with by checking its SHA-256 checksum.
+
+1. Download the matching .sha256 file:
+
+From the release page, download:
+
+- Rregex.dmg.sha256 if you downloaded the `.dmg`
+- Rregex.zip.sha256 if you downloaded the `.zip`
+
+2. Verify the file integrity through the command line *(make sure the downloaded dmg or zip is in the same folder as the checksum)*:
+
+```sh
+# For the DMG
+shasum -a 256 -c Rregex.dmg.sha256
+
+# For the ZIP
+shasum -a 256 -c Rregex.zip.sha256
+```
+
+## Contributions
+
+Pull requests are welcome! Whether it's a bug fix, feature suggestion, or just a cool idea—[open an issue](https://github.com/Thinkr1/Rregex/issues/new/choose) or submit a PR.
+
+## License
+
+This project is released under the [MIT License](LICENSE).
