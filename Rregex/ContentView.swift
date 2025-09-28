@@ -530,7 +530,7 @@ struct AttributedTextView: NSViewRepresentable {
     @Binding var attributedText: NSAttributedString
     var onTextChange: (String) -> Void
     
-    func makeNSView(context: Context) -> NSTextView {
+    func makeNSView(context: Context) -> NSScrollView {
         let textView = NSTextView()
         textView.isEditable = true
         textView.isSelectable = true
@@ -539,19 +539,32 @@ struct AttributedTextView: NSViewRepresentable {
         textView.backgroundColor = .clear
         textView.delegate = context.coordinator
         textView.textContainerInset = NSSize(width:5, height:5)
-        return textView
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = true
+        textView.autoresizingMask = [.width]
+        textView.textContainer?.widthTracksTextView = true
+        
+        let scrollView = NSScrollView()
+        scrollView.hasVerticalScroller = true
+//        scrollView.hasHorizontalScroller = true
+        scrollView.documentView = textView
+        scrollView.drawsBackground = false
+        
+        return scrollView
     }
     
-    func updateNSView(_ nsView: NSTextView, context: Context) {
-        if nsView.attributedString() != attributedText {
-            nsView.textStorage?.setAttributedString(attributedText)
-            nsView.textColor = NSColor.controlTextColor
-            nsView.font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-            nsView.backgroundColor = .clear
-            nsView.isEditable = true
-            nsView.isSelectable = true
-            nsView.delegate = context.coordinator
-            nsView.textContainerInset = NSSize(width:5, height:5)
+    func updateNSView(_ nsView: NSScrollView, context: Context) {
+        guard let textView = nsView.documentView as? NSTextView else { return }
+        
+        if textView.attributedString() != attributedText {
+            textView.textStorage?.setAttributedString(attributedText)
+            textView.textColor = NSColor.controlTextColor
+            textView.font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+            textView.backgroundColor = .clear
+            textView.isEditable = true
+            textView.isSelectable = true
+            textView.delegate = context.coordinator
+            textView.textContainerInset = NSSize(width:5, height:5)
         }
     }
     
@@ -577,6 +590,8 @@ struct AttributedTextView: NSViewRepresentable {
                     .font: NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
                     .backgroundColor: NSColor.clear
                 ], range: NSRange(location: 0, length: attributedString.length))
+                
+                // You can optionally update textView.textStorage here
             }
         }
     }
